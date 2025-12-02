@@ -28,241 +28,38 @@ interface MenuItem {
   image_url: string;
 }
 
-interface Reservation {
-  id: string;
-  customer_name: string;
-  customer_email: string;
-  customer_phone: string;
-  reservation_date: string;
-  reservation_time: string;
-  guest_count: number;
-  status: string;
-}
-
 export default function AdminPanel() {
-  const [activeTab, setActiveTab] = useState<'tables' | 'chefs' | 'menu' | 'reservations'>('tables');
+  const [activeTab, setActiveTab] = useState<'tables' | 'chefs' | 'menu'>('tables');
   const [tables, setTables] = useState<Table[]>([]);
   const [chefs, setChefs] = useState<Chef[]>([]);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
-  const [reservations, setReservations] = useState<Reservation[]>([]);
   const [loading, setLoading] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
-
-  // Table form
   const [tableForm, setTableForm] = useState({ table_number: '', capacity: '', location: '', status: 'available' });
-  // Chef form
   const [chefForm, setChefForm] = useState({ name: '', biography: '', signature_dish: '', image_url: '' });
-  // Menu form
   const [menuForm, setMenuForm] = useState({ name: '', description: '', price: '', category: 'Saray Başlangıçları', image_url: '' });
 
   useEffect(() => {
     fetchData();
-  }, [activeTab]);
+  }, []);
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      if (activeTab === 'tables') {
-        const { data } = await supabase.from('tables').select('*').order('table_number');
-        setTables(data || []);
-      } else if (activeTab === 'chefs') {
-        const { data } = await supabase.from('chefs').select('*').order('name');
-        setChefs(data || []);
-      } else if (activeTab === 'menu') {
-        const { data } = await supabase.from('menu_items').select('*').order('category');
-        setMenuItems(data || []);
-      } else if (activeTab === 'reservations') {
-        const { data } = await supabase.from('reservations').select('*').order('reservation_date', { ascending: false });
-        setReservations(data || []);
-      }
+      const [tablesData, chefsData, menuData] = await Promise.all([
+        supabase.from('tables').select('*').order('table_number'),
+        supabase.from('chefs').select('*').order('name'),
+        supabase.from('menu_items').select('*').order('category')
+      ]);
+      if (tablesData.data) setTables(tablesData.data);
+      if (chefsData.data) setChefs(chefsData.data);
+      if (menuData.data) setMenuItems(menuData.data);
     } catch (error) {
-      console.error('Error fetching data:', error);
+      console.error('Error:', error);
     } finally {
       setLoading(false);
     }
-  };
-
-  // Table operations
-  const handleSaveTable = async () => {
-    if (!tableForm.table_number || !tableForm.capacity || !tableForm.location) {
-      alert('Tüm alanları doldurun');
-      return;
-    }
-
-    try {
-      if (editingId) {
-        const { error } = await supabase
-          .from('tables')
-          .update({
-            table_number: parseInt(tableForm.table_number),
-            capacity: parseInt(tableForm.capacity),
-            location: tableForm.location,
-            status: tableForm.status
-          })
-          .eq('id', editingId);
-
-        if (error) throw error;
-      } else {
-        const { error } = await supabase
-          .from('tables')
-          .insert([{
-            table_number: parseInt(tableForm.table_number),
-            capacity: parseInt(tableForm.capacity),
-            location: tableForm.location,
-            status: tableForm.status
-          }]);
-
-        if (error) throw error;
-      }
-
-      setTableForm({ table_number: '', capacity: '', location: '', status: 'available' });
-      setEditingId(null);
-      setShowForm(false);
-      fetchData();
-    } catch (error) {
-      console.error('Error saving table:', error);
-      alert('Hata oluştu');
-    }
-  };
-
-  const handleEditTable = (table: Table) => {
-    setTableForm({
-      table_number: table.table_number.toString(),
-      capacity: table.capacity.toString(),
-      location: table.location,
-      status: table.status
-    });
-    setEditingId(table.id);
-    setShowForm(true);
-  };
-
-  const handleDeleteTable = async (id: string) => {
-    if (!confirm('Bu masayı silmek istediğinize emin misiniz?')) return;
-
-    try {
-      const { error } = await supabase.from('tables').delete().eq('id', id);
-      if (error) throw error;
-      fetchData();
-    } catch (error) {
-      console.error('Error deleting table:', error);
-      alert('Hata oluştu');
-    }
-  };
-
-  // Chef operations
-  const handleSaveChef = async () => {
-    if (!chefForm.name || !chefForm.biography || !chefForm.signature_dish || !chefForm.image_url) {
-      alert('Tüm alanları doldurun');
-      return;
-    }
-
-    try {
-      if (editingId) {
-        const { error } = await supabase
-          .from('chefs')
-          .update(chefForm)
-          .eq('id', editingId);
-
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from('chefs').insert([chefForm]);
-        if (error) throw error;
-      }
-
-      setChefForm({ name: '', biography: '', signature_dish: '', image_url: '' });
-      setEditingId(null);
-      setShowForm(false);
-      fetchData();
-    } catch (error) {
-      console.error('Error saving chef:', error);
-      alert('Hata oluştu');
-    }
-  };
-
-  const handleEditChef = (chef: Chef) => {
-    setChefForm(chef);
-    setEditingId(chef.id);
-    setShowForm(true);
-  };
-
-  const handleDeleteChef = async (id: string) => {
-    if (!confirm('Bu aşçıyı silmek istediğinize emin misiniz?')) return;
-
-    try {
-      const { error } = await supabase.from('chefs').delete().eq('id', id);
-      if (error) throw error;
-      fetchData();
-    } catch (error) {
-      console.error('Error deleting chef:', error);
-      alert('Hata oluştu');
-    }
-  };
-
-  // Menu operations
-  const handleSaveMenuItem = async () => {
-    if (!menuForm.name || !menuForm.description || !menuForm.price || !menuForm.image_url) {
-      alert('Tüm alanları doldurun');
-      return;
-    }
-
-    try {
-      if (editingId) {
-        const { error } = await supabase
-          .from('menu_items')
-          .update({
-            ...menuForm,
-            price: parseFloat(menuForm.price)
-          })
-          .eq('id', editingId);
-
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from('menu_items').insert([{
-          ...menuForm,
-          price: parseFloat(menuForm.price)
-        }]);
-        if (error) throw error;
-      }
-
-      setMenuForm({ name: '', description: '', price: '', category: 'Saray Başlangıçları', image_url: '' });
-      setEditingId(null);
-      setShowForm(false);
-      fetchData();
-    } catch (error) {
-      console.error('Error saving menu item:', error);
-      alert('Hata oluştu');
-    }
-  };
-
-  const handleEditMenuItem = (item: MenuItem) => {
-    setMenuForm({
-      name: item.name,
-      description: item.description,
-      price: item.price.toString(),
-      category: item.category,
-      image_url: item.image_url
-    });
-    setEditingId(item.id);
-    setShowForm(true);
-  };
-
-  const handleDeleteMenuItem = async (id: string) => {
-    if (!confirm('Bu yemeği silmek istediğinize emin misiniz?')) return;
-
-    try {
-      const { error } = await supabase.from('menu_items').delete().eq('id', id);
-      if (error) throw error;
-      fetchData();
-    } catch (error) {
-      console.error('Error deleting menu item:', error);
-      alert('Hata oluştu');
-    }
-  };
-
-  const handleLogout = () => {
-    removeAdminToken();
-    window.location.href = '/';
   };
 
   const resetForm = () => {
@@ -273,16 +70,93 @@ export default function AdminPanel() {
     setShowForm(false);
   };
 
+  const handleSaveTable = async () => {
+    if (!tableForm.table_number || !tableForm.capacity || !tableForm.location) {
+      alert('Tüm alanları doldurun');
+      return;
+    }
+    try {
+      if (editingId) {
+        await supabase.from('tables').update({
+          table_number: parseInt(tableForm.table_number),
+          capacity: parseInt(tableForm.capacity),
+          location: tableForm.location,
+          status: tableForm.status
+        }).eq('id', editingId);
+      } else {
+        await supabase.from('tables').insert([{
+          table_number: parseInt(tableForm.table_number),
+          capacity: parseInt(tableForm.capacity),
+          location: tableForm.location,
+          status: tableForm.status
+        }]);
+      }
+      fetchData();
+      resetForm();
+    } catch (error) {
+      alert('Hata oluştu');
+    }
+  };
+
+  const handleSaveChef = async () => {
+    if (!chefForm.name || !chefForm.biography || !chefForm.signature_dish || !chefForm.image_url) {
+      alert('Tüm alanları doldurun');
+      return;
+    }
+    try {
+      if (editingId) {
+        await supabase.from('chefs').update(chefForm).eq('id', editingId);
+      } else {
+        await supabase.from('chefs').insert([chefForm]);
+      }
+      fetchData();
+      resetForm();
+    } catch (error) {
+      alert('Hata oluştu');
+    }
+  };
+
+  const handleSaveMenuItem = async () => {
+    if (!menuForm.name || !menuForm.description || !menuForm.price || !menuForm.image_url) {
+      alert('Tüm alanları doldurun');
+      return;
+    }
+    try {
+      if (editingId) {
+        await supabase.from('menu_items').update({
+          name: menuForm.name,
+          description: menuForm.description,
+          price: parseFloat(menuForm.price),
+          category: menuForm.category,
+          image_url: menuForm.image_url
+        }).eq('id', editingId);
+      } else {
+        await supabase.from('menu_items').insert([{
+          name: menuForm.name,
+          description: menuForm.description,
+          price: parseFloat(menuForm.price),
+          category: menuForm.category,
+          image_url: menuForm.image_url
+        }]);
+      }
+      fetchData();
+      resetForm();
+    } catch (error) {
+      alert('Hata oluştu');
+    }
+  };
+
+  const handleLogout = () => {
+    removeAdminToken();
+    window.location.href = '/';
+  };
+
   return (
     <div className="min-h-screen bg-[#2A0A10]">
       <nav className="bg-[#1a0508] border-b border-[#D4AF37]/20 p-4 sticky top-0 z-40">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <h1 className="font-serif text-2xl font-bold text-[#D4AF37]">Admin Panel</h1>
-          <button
-            onClick={handleLogout}
-            className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded
-                     hover:bg-red-700 transition-colors"
-          >
+          <button onClick={handleLogout} className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700">
             <LogOut size={18} />
             Çıkış Yap
           </button>
@@ -290,167 +164,70 @@ export default function AdminPanel() {
       </nav>
 
       <div className="max-w-7xl mx-auto p-6">
-        <div className="flex gap-4 mb-6 border-b border-[#D4AF37]/20 overflow-x-auto">
-          {(['tables', 'chefs', 'menu', 'reservations'] as const).map(tab => (
+        <div className="flex gap-4 mb-6 border-b border-[#D4AF37]/20">
+          {(['tables', 'chefs', 'menu'] as const).map(tab => (
             <button
               key={tab}
-              onClick={() => {
-                setActiveTab(tab);
-                resetForm();
-              }}
-              className={`px-4 py-2 font-semibold transition-colors whitespace-nowrap ${
-                activeTab === tab
-                  ? 'text-[#D4AF37] border-b-2 border-[#D4AF37]'
-                  : 'text-[#F5F5DC]/60 hover:text-[#F5F5DC]'
-              }`}
+              onClick={() => { setActiveTab(tab); resetForm(); }}
+              className={`px-4 py-2 font-semibold ${activeTab === tab ? 'text-[#D4AF37] border-b-2 border-[#D4AF37]' : 'text-[#F5F5DC]/60'}`}
             >
               {tab === 'tables' && 'Masalar'}
               {tab === 'chefs' && 'Aşçılar'}
               {tab === 'menu' && 'Menü'}
-              {tab === 'reservations' && 'Rezervasyonlar'}
             </button>
           ))}
         </div>
 
         {showForm && (
           <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-            <div className="bg-gradient-to-br from-[#3A1A20] to-[#2A0A10] rounded-lg p-8 w-full max-w-2xl border-2 border-[#D4AF37]/30 shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="bg-[#3A1A20] rounded-lg p-8 w-full max-w-md border-2 border-[#D4AF37]/30">
               <div className="flex justify-between items-center mb-6">
-                <h2 className="font-serif text-2xl font-bold text-[#D4AF37]">
-                  {activeTab === 'tables' && (editingId ? 'Masayı Düzenle' : 'Yeni Masa Ekle')}
-                  {activeTab === 'chefs' && (editingId ? 'Aşçıyı Düzenle' : 'Yeni Aşçı Ekle')}
-                  {activeTab === 'menu' && (editingId ? 'Yemeği Düzenle' : 'Yeni Yemek Ekle')}
+                <h2 className="font-serif text-xl font-bold text-[#D4AF37]">
+                  {activeTab === 'tables' && (editingId ? 'Masayı Düzenle' : 'Yeni Masa')}
+                  {activeTab === 'chefs' && (editingId ? 'Aşçıyı Düzenle' : 'Yeni Aşçı')}
+                  {activeTab === 'menu' && (editingId ? 'Yemeği Düzenle' : 'Yeni Yemek')}
                 </h2>
-                <button onClick={resetForm} className="text-[#D4AF37] hover:text-[#F5F5DC]">
+                <button onClick={resetForm} className="text-[#D4AF37]">
                   <X size={24} />
                 </button>
               </div>
 
               {activeTab === 'tables' && (
-                <div className="space-y-4">
-                  <input
-                    type="number"
-                    placeholder="Masa Numarası"
-                    value={tableForm.table_number}
-                    onChange={(e) => setTableForm({ ...tableForm, table_number: e.target.value })}
-                    className="w-full px-4 py-2 bg-[#2A0A10] border border-[#D4AF37]/30 rounded text-[#F5F5DC] focus:outline-none focus:border-[#D4AF37]"
-                  />
-                  <input
-                    type="number"
-                    placeholder="Kapasite (Kişi)"
-                    value={tableForm.capacity}
-                    onChange={(e) => setTableForm({ ...tableForm, capacity: e.target.value })}
-                    className="w-full px-4 py-2 bg-[#2A0A10] border border-[#D4AF37]/30 rounded text-[#F5F5DC] focus:outline-none focus:border-[#D4AF37]"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Konum (Örn: Pencere Yanı)"
-                    value={tableForm.location}
-                    onChange={(e) => setTableForm({ ...tableForm, location: e.target.value })}
-                    className="w-full px-4 py-2 bg-[#2A0A10] border border-[#D4AF37]/30 rounded text-[#F5F5DC] focus:outline-none focus:border-[#D4AF37]"
-                  />
-                  <select
-                    value={tableForm.status}
-                    onChange={(e) => setTableForm({ ...tableForm, status: e.target.value })}
-                    className="w-full px-4 py-2 bg-[#2A0A10] border border-[#D4AF37]/30 rounded text-[#F5F5DC] focus:outline-none focus:border-[#D4AF37]"
-                  >
+                <div className="space-y-3">
+                  <input type="number" placeholder="Masa No" value={tableForm.table_number} onChange={(e) => setTableForm({...tableForm, table_number: e.target.value})} className="w-full px-3 py-2 bg-[#2A0A10] border border-[#D4AF37]/30 rounded text-[#F5F5DC]" />
+                  <input type="number" placeholder="Kapasite" value={tableForm.capacity} onChange={(e) => setTableForm({...tableForm, capacity: e.target.value})} className="w-full px-3 py-2 bg-[#2A0A10] border border-[#D4AF37]/30 rounded text-[#F5F5DC]" />
+                  <input type="text" placeholder="Konum" value={tableForm.location} onChange={(e) => setTableForm({...tableForm, location: e.target.value})} className="w-full px-3 py-2 bg-[#2A0A10] border border-[#D4AF37]/30 rounded text-[#F5F5DC]" />
+                  <select value={tableForm.status} onChange={(e) => setTableForm({...tableForm, status: e.target.value})} className="w-full px-3 py-2 bg-[#2A0A10] border border-[#D4AF37]/30 rounded text-[#F5F5DC]">
                     <option value="available">Müsait</option>
                     <option value="reserved">Rezerveli</option>
-                    <option value="occupied">Dolu</option>
                   </select>
-                  <button
-                    onClick={handleSaveTable}
-                    className="w-full py-2 bg-[#D4AF37] text-[#2A0A10] font-bold rounded hover:bg-[#F5F5DC] transition-colors"
-                  >
-                    Kaydet
-                  </button>
+                  <button onClick={handleSaveTable} className="w-full py-2 bg-[#D4AF37] text-[#2A0A10] font-bold rounded">Kaydet</button>
                 </div>
               )}
 
               {activeTab === 'chefs' && (
-                <div className="space-y-4">
-                  <input
-                    type="text"
-                    placeholder="Aşçı Adı"
-                    value={chefForm.name}
-                    onChange={(e) => setChefForm({ ...chefForm, name: e.target.value })}
-                    className="w-full px-4 py-2 bg-[#2A0A10] border border-[#D4AF37]/30 rounded text-[#F5F5DC] focus:outline-none focus:border-[#D4AF37]"
-                  />
-                  <textarea
-                    placeholder="Biyografi"
-                    value={chefForm.biography}
-                    onChange={(e) => setChefForm({ ...chefForm, biography: e.target.value })}
-                    className="w-full px-4 py-2 bg-[#2A0A10] border border-[#D4AF37]/30 rounded text-[#F5F5DC] focus:outline-none focus:border-[#D4AF37] h-24"
-                  />
-                  <input
-                    type="text"
-                    placeholder="İmza Yemeği"
-                    value={chefForm.signature_dish}
-                    onChange={(e) => setChefForm({ ...chefForm, signature_dish: e.target.value })}
-                    className="w-full px-4 py-2 bg-[#2A0A10] border border-[#D4AF37]/30 rounded text-[#F5F5DC] focus:outline-none focus:border-[#D4AF37]"
-                  />
-                  <input
-                    type="url"
-                    placeholder="Resim URL"
-                    value={chefForm.image_url}
-                    onChange={(e) => setChefForm({ ...chefForm, image_url: e.target.value })}
-                    className="w-full px-4 py-2 bg-[#2A0A10] border border-[#D4AF37]/30 rounded text-[#F5F5DC] focus:outline-none focus:border-[#D4AF37]"
-                  />
-                  <button
-                    onClick={handleSaveChef}
-                    className="w-full py-2 bg-[#D4AF37] text-[#2A0A10] font-bold rounded hover:bg-[#F5F5DC] transition-colors"
-                  >
-                    Kaydet
-                  </button>
+                <div className="space-y-3">
+                  <input type="text" placeholder="Adı" value={chefForm.name} onChange={(e) => setChefForm({...chefForm, name: e.target.value})} className="w-full px-3 py-2 bg-[#2A0A10] border border-[#D4AF37]/30 rounded text-[#F5F5DC]" />
+                  <textarea placeholder="Biyografi" value={chefForm.biography} onChange={(e) => setChefForm({...chefForm, biography: e.target.value})} className="w-full px-3 py-2 bg-[#2A0A10] border border-[#D4AF37]/30 rounded text-[#F5F5DC] h-20" />
+                  <input type="text" placeholder="İmza Yemeği" value={chefForm.signature_dish} onChange={(e) => setChefForm({...chefForm, signature_dish: e.target.value})} className="w-full px-3 py-2 bg-[#2A0A10] border border-[#D4AF37]/30 rounded text-[#F5F5DC]" />
+                  <input type="url" placeholder="Resim URL" value={chefForm.image_url} onChange={(e) => setChefForm({...chefForm, image_url: e.target.value})} className="w-full px-3 py-2 bg-[#2A0A10] border border-[#D4AF37]/30 rounded text-[#F5F5DC]" />
+                  <button onClick={handleSaveChef} className="w-full py-2 bg-[#D4AF37] text-[#2A0A10] font-bold rounded">Kaydet</button>
                 </div>
               )}
 
               {activeTab === 'menu' && (
-                <div className="space-y-4">
-                  <input
-                    type="text"
-                    placeholder="Yemek Adı"
-                    value={menuForm.name}
-                    onChange={(e) => setMenuForm({ ...menuForm, name: e.target.value })}
-                    className="w-full px-4 py-2 bg-[#2A0A10] border border-[#D4AF37]/30 rounded text-[#F5F5DC] focus:outline-none focus:border-[#D4AF37]"
-                  />
-                  <textarea
-                    placeholder="Açıklama"
-                    value={menuForm.description}
-                    onChange={(e) => setMenuForm({ ...menuForm, description: e.target.value })}
-                    className="w-full px-4 py-2 bg-[#2A0A10] border border-[#D4AF37]/30 rounded text-[#F5F5DC] focus:outline-none focus:border-[#D4AF37] h-20"
-                  />
-                  <select
-                    value={menuForm.category}
-                    onChange={(e) => setMenuForm({ ...menuForm, category: e.target.value })}
-                    className="w-full px-4 py-2 bg-[#2A0A10] border border-[#D4AF37]/30 rounded text-[#F5F5DC] focus:outline-none focus:border-[#D4AF37]"
-                  >
+                <div className="space-y-3">
+                  <input type="text" placeholder="Yemek Adı" value={menuForm.name} onChange={(e) => setMenuForm({...menuForm, name: e.target.value})} className="w-full px-3 py-2 bg-[#2A0A10] border border-[#D4AF37]/30 rounded text-[#F5F5DC]" />
+                  <textarea placeholder="Açıklama" value={menuForm.description} onChange={(e) => setMenuForm({...menuForm, description: e.target.value})} className="w-full px-3 py-2 bg-[#2A0A10] border border-[#D4AF37]/30 rounded text-[#F5F5DC] h-16" />
+                  <select value={menuForm.category} onChange={(e) => setMenuForm({...menuForm, category: e.target.value})} className="w-full px-3 py-2 bg-[#2A0A10] border border-[#D4AF37]/30 rounded text-[#F5F5DC]">
                     <option>Saray Başlangıçları</option>
                     <option>Taş Fırın</option>
                     <option>Ana Yemekler</option>
                     <option>Tatlılar</option>
                   </select>
-                  <input
-                    type="number"
-                    placeholder="Fiyat (₺)"
-                    step="0.01"
-                    value={menuForm.price}
-                    onChange={(e) => setMenuForm({ ...menuForm, price: e.target.value })}
-                    className="w-full px-4 py-2 bg-[#2A0A10] border border-[#D4AF37]/30 rounded text-[#F5F5DC] focus:outline-none focus:border-[#D4AF37]"
-                  />
-                  <input
-                    type="url"
-                    placeholder="Resim URL"
-                    value={menuForm.image_url}
-                    onChange={(e) => setMenuForm({ ...menuForm, image_url: e.target.value })}
-                    className="w-full px-4 py-2 bg-[#2A0A10] border border-[#D4AF37]/30 rounded text-[#F5F5DC] focus:outline-none focus:border-[#D4AF37]"
-                  />
-                  <button
-                    onClick={handleSaveMenuItem}
-                    className="w-full py-2 bg-[#D4AF37] text-[#2A0A10] font-bold rounded hover:bg-[#F5F5DC] transition-colors"
-                  >
-                    Kaydet
-                  </button>
+                  <input type="number" placeholder="Fiyat" step="0.01" value={menuForm.price} onChange={(e) => setMenuForm({...menuForm, price: e.target.value})} className="w-full px-3 py-2 bg-[#2A0A10] border border-[#D4AF37]/30 rounded text-[#F5F5DC]" />
+                  <input type="url" placeholder="Resim URL" value={menuForm.image_url} onChange={(e) => setMenuForm({...menuForm, image_url: e.target.value})} className="w-full px-3 py-2 bg-[#2A0A10] border border-[#D4AF37]/30 rounded text-[#F5F5DC]" />
+                  <button onClick={handleSaveMenuItem} className="w-full py-2 bg-[#D4AF37] text-[#2A0A10] font-bold rounded">Kaydet</button>
                 </div>
               )}
             </div>
@@ -463,149 +240,97 @@ export default function AdminPanel() {
           <>
             {activeTab === 'tables' && (
               <div>
-                <button
-                  onClick={() => {
-                    resetForm();
-                    setShowForm(true);
-                  }}
-                  className="mb-6 flex items-center gap-2 px-4 py-2 bg-[#D4AF37] text-[#2A0A10] rounded font-semibold hover:bg-[#F5F5DC] transition-colors"
-                >
+                <button onClick={() => {resetForm(); setShowForm(true);}} className="mb-6 flex items-center gap-2 px-4 py-2 bg-[#D4AF37] text-[#2A0A10] rounded font-bold hover:bg-[#F5F5DC]">
                   <Plus size={18} />
                   Yeni Masa Ekle
                 </button>
-                <div className="grid gap-4">
-                  {tables.map(table => (
-                    <div key={table.id} className="bg-[#3A1A20] p-4 rounded border border-[#D4AF37]/20 flex justify-between items-center">
-                      <div>
-                        <h3 className="text-[#D4AF37] font-bold">Masa {table.table_number}</h3>
-                        <p className="text-[#F5F5DC]/80">{table.capacity} Kişilik - {table.location}</p>
-                        <p className="text-sm text-[#F5F5DC]/60">Durum: {table.status === 'available' ? 'Müsait' : table.status === 'reserved' ? 'Rezerveli' : 'Dolu'}</p>
+                <div className="grid gap-3">
+                  {tables.length === 0 ? (
+                    <p className="text-[#F5F5DC]/60">Henüz masa eklenmemiş</p>
+                  ) : (
+                    tables.map(table => (
+                      <div key={table.id} className="bg-[#3A1A20] p-4 rounded border border-[#D4AF37]/20 flex justify-between items-center">
+                        <div>
+                          <h3 className="text-[#D4AF37] font-bold">Masa {table.table_number}</h3>
+                          <p className="text-[#F5F5DC]/80 text-sm">{table.capacity} Kişi - {table.location}</p>
+                        </div>
+                        <div className="flex gap-2">
+                          <button onClick={() => { setTableForm({table_number: table.table_number.toString(), capacity: table.capacity.toString(), location: table.location, status: table.status}); setEditingId(table.id); setShowForm(true); }} className="p-2 bg-blue-600 rounded hover:bg-blue-700">
+                            <Edit2 size={16} className="text-white" />
+                          </button>
+                          <button onClick={async () => { if(confirm('Sil?')) { await supabase.from('tables').delete().eq('id', table.id); fetchData(); }}} className="p-2 bg-red-600 rounded hover:bg-red-700">
+                            <Trash2 size={16} className="text-white" />
+                          </button>
+                        </div>
                       </div>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => handleEditTable(table)}
-                          className="p-2 bg-blue-600 rounded hover:bg-blue-700"
-                        >
-                          <Edit2 size={18} className="text-white" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteTable(table.id)}
-                          className="p-2 bg-red-600 rounded hover:bg-red-700"
-                        >
-                          <Trash2 size={18} className="text-white" />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </div>
               </div>
             )}
 
             {activeTab === 'chefs' && (
               <div>
-                <button
-                  onClick={() => {
-                    resetForm();
-                    setShowForm(true);
-                  }}
-                  className="mb-6 flex items-center gap-2 px-4 py-2 bg-[#D4AF37] text-[#2A0A10] rounded font-semibold hover:bg-[#F5F5DC] transition-colors"
-                >
+                <button onClick={() => {resetForm(); setShowForm(true);}} className="mb-6 flex items-center gap-2 px-4 py-2 bg-[#D4AF37] text-[#2A0A10] rounded font-bold hover:bg-[#F5F5DC]">
                   <Plus size={18} />
                   Yeni Aşçı Ekle
                 </button>
-                <div className="grid gap-4">
-                  {chefs.map(chef => (
-                    <div key={chef.id} className="bg-[#3A1A20] p-4 rounded border border-[#D4AF37]/20">
-                      <div className="flex justify-between items-start">
-                        <div className="flex-1">
-                          <h3 className="text-[#D4AF37] font-bold text-lg">{chef.name}</h3>
-                          <p className="text-[#F5F5DC]/80 text-sm line-clamp-2">{chef.biography}</p>
-                          <p className="text-sm text-[#D4AF37] mt-2">İmza Yemeği: {chef.signature_dish}</p>
-                        </div>
-                        <div className="flex gap-2 ml-4">
-                          <button
-                            onClick={() => handleEditChef(chef)}
-                            className="p-2 bg-blue-600 rounded hover:bg-blue-700"
-                          >
-                            <Edit2 size={18} className="text-white" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteChef(chef.id)}
-                            className="p-2 bg-red-600 rounded hover:bg-red-700"
-                          >
-                            <Trash2 size={18} className="text-white" />
-                          </button>
+                <div className="grid gap-3">
+                  {chefs.length === 0 ? (
+                    <p className="text-[#F5F5DC]/60">Henüz aşçı eklenmemiş</p>
+                  ) : (
+                    chefs.map(chef => (
+                      <div key={chef.id} className="bg-[#3A1A20] p-4 rounded border border-[#D4AF37]/20">
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <h3 className="text-[#D4AF37] font-bold">{chef.name}</h3>
+                            <p className="text-[#F5F5DC]/80 text-sm line-clamp-2">{chef.biography}</p>
+                            <p className="text-sm text-[#D4AF37] mt-1">İmza: {chef.signature_dish}</p>
+                          </div>
+                          <div className="flex gap-2 ml-4">
+                            <button onClick={() => { setChefForm(chef); setEditingId(chef.id); setShowForm(true); }} className="p-2 bg-blue-600 rounded hover:bg-blue-700">
+                              <Edit2 size={16} className="text-white" />
+                            </button>
+                            <button onClick={async () => { if(confirm('Sil?')) { await supabase.from('chefs').delete().eq('id', chef.id); fetchData(); }}} className="p-2 bg-red-600 rounded hover:bg-red-700">
+                              <Trash2 size={16} className="text-white" />
+                            </button>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </div>
               </div>
             )}
 
             {activeTab === 'menu' && (
               <div>
-                <button
-                  onClick={() => {
-                    resetForm();
-                    setShowForm(true);
-                  }}
-                  className="mb-6 flex items-center gap-2 px-4 py-2 bg-[#D4AF37] text-[#2A0A10] rounded font-semibold hover:bg-[#F5F5DC] transition-colors"
-                >
+                <button onClick={() => {resetForm(); setShowForm(true);}} className="mb-6 flex items-center gap-2 px-4 py-2 bg-[#D4AF37] text-[#2A0A10] rounded font-bold hover:bg-[#F5F5DC]">
                   <Plus size={18} />
                   Yeni Yemek Ekle
                 </button>
-                <div className="grid gap-4">
-                  {menuItems.map(item => (
-                    <div key={item.id} className="bg-[#3A1A20] p-4 rounded border border-[#D4AF37]/20">
-                      <div className="flex justify-between items-start">
-                        <div className="flex-1">
-                          <h3 className="text-[#D4AF37] font-bold text-lg">{item.name}</h3>
-                          <p className="text-[#F5F5DC]/80 text-sm">{item.description}</p>
-                          <div className="flex gap-4 mt-2 text-sm">
-                            <span className="text-[#F5F5DC]/60">{item.category}</span>
-                            <span className="text-[#D4AF37] font-bold">₺{item.price.toFixed(2)}</span>
-                          </div>
-                        </div>
-                        <div className="flex gap-2 ml-4">
-                          <button
-                            onClick={() => handleEditMenuItem(item)}
-                            className="p-2 bg-blue-600 rounded hover:bg-blue-700"
-                          >
-                            <Edit2 size={18} className="text-white" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteMenuItem(item.id)}
-                            className="p-2 bg-red-600 rounded hover:bg-red-700"
-                          >
-                            <Trash2 size={18} className="text-white" />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {activeTab === 'reservations' && (
-              <div>
-                <div className="space-y-4">
-                  {reservations.length === 0 ? (
-                    <p className="text-[#F5F5DC]/60">Henüz rezervasyon bulunmuyor</p>
+                <div className="grid gap-3">
+                  {menuItems.length === 0 ? (
+                    <p className="text-[#F5F5DC]/60">Henüz yemek eklenmemiş</p>
                   ) : (
-                    reservations.map(res => (
-                      <div key={res.id} className="bg-[#3A1A20] p-4 rounded border border-[#D4AF37]/20">
-                        <div className="grid md:grid-cols-2 gap-4">
-                          <div>
-                            <p className="text-[#D4AF37] font-bold">{res.customer_name}</p>
-                            <p className="text-[#F5F5DC]/80 text-sm">{res.customer_email}</p>
-                            <p className="text-[#F5F5DC]/80 text-sm">{res.customer_phone}</p>
+                    menuItems.map(item => (
+                      <div key={item.id} className="bg-[#3A1A20] p-4 rounded border border-[#D4AF37]/20">
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <h3 className="text-[#D4AF37] font-bold">{item.name}</h3>
+                            <p className="text-[#F5F5DC]/80 text-sm">{item.description}</p>
+                            <div className="flex gap-4 mt-1 text-sm">
+                              <span className="text-[#F5F5DC]/60">{item.category}</span>
+                              <span className="text-[#D4AF37] font-bold">₺{item.price.toFixed(2)}</span>
+                            </div>
                           </div>
-                          <div>
-                            <p className="text-[#F5F5DC]">{res.reservation_date} - {res.reservation_time}</p>
-                            <p className="text-[#F5F5DC]/80 text-sm">{res.guest_count} Kişi</p>
-                            <p className="text-sm text-[#D4AF37] font-semibold">Durum: {res.status === 'pending' ? 'Beklemede' : res.status === 'confirmed' ? 'Onaylandı' : res.status === 'completed' ? 'Tamamlandı' : 'İptal'}</p>
+                          <div className="flex gap-2 ml-4">
+                            <button onClick={() => { setMenuForm({name: item.name, description: item.description, price: item.price.toString(), category: item.category, image_url: item.image_url}); setEditingId(item.id); setShowForm(true); }} className="p-2 bg-blue-600 rounded hover:bg-blue-700">
+                              <Edit2 size={16} className="text-white" />
+                            </button>
+                            <button onClick={async () => { if(confirm('Sil?')) { await supabase.from('menu_items').delete().eq('id', item.id); fetchData(); }}} className="p-2 bg-red-600 rounded hover:bg-red-700">
+                              <Trash2 size={16} className="text-white" />
+                            </button>
                           </div>
                         </div>
                       </div>
